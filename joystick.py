@@ -1,4 +1,5 @@
 from machine import Pin, ADC
+from sensor import *
 
 class JoystickWirings:
 
@@ -12,7 +13,7 @@ class JoystickWirings:
         return JoystickWirings(pinX=34, pinY=35, pinButton=25)
 
 
-class JoystickState:    
+class JoystickState(SensorState):    
     
     def __init__(self, x=0, y=0, button=False):
         self.x = x
@@ -22,7 +23,7 @@ class JoystickState:
     def __str__(self):
         return "X: {}, Y: {}, Button: {}".format(self.x, self.y, self.button)
 
-class Joystick:
+class Joystick(Sensor):
 
     def __init__(self, wiring:JoystickWirings):
         # Axes
