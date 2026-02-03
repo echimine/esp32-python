@@ -61,9 +61,9 @@ def on_button_clicked(btn):
     )
     ws.send(msg.to_json())
 
-def on_joystick_use(joystick:Joystick):
+def on_click_joystick(joystick:Joystick):
     print(joystick.state.to_json())
-    print(joystick.state.x)
+    print(joystick.state.pressed)
     print("clické joystick")
     msg = Message(
         message_type=ENVOI_TYPE.TEXT,
@@ -73,13 +73,13 @@ def on_joystick_use(joystick:Joystick):
     )
     ws.send(msg.to_json())
 
-def on_card_detected(uid):
-    print("Carte détectée :", uid)
+def on_card_detected(scanner:Scanner):
+    print("Carte détectée :", scanner.state.uid)
     msg = Message(
         message_type=ENVOI_TYPE.TEXT,
         emitter="eliott",
         receiver="ALL",
-        value="Yo les loulous"
+        value=scanner.state.to_json()
     )
     ws.send(msg.to_json())
     
@@ -87,20 +87,19 @@ def on_led_strip_changed(state):
     pass
     #print("LED strip updated:", state)
     
-def on_light_changed(state):
-     strip.bar(state.percent, color=(255, 0, 0))
-#     msg = Message(
-#         message_type=ENVOI_TYPE.TEXT,
-#         emitter="eliott",
-#         receiver="ALL",
-#         value=state.percent
-#     )
-    #ws.send(msg.to_json())
-
+def on_light_changed(lightSensor:LightSensor):
+    strip.bar(lightSensor.state.percent, color=(255, 0, 0))
+    msg = Message(
+        message_type=ENVOI_TYPE.TEXT,
+        emitter="eliott",
+        receiver="ALL",
+        value=lightSensor.state.to_json()
+    )
+    ws.send(msg.to_json())
 
 
 button = Button(ButtonWirings.default(), on_button_clicked)
-joystick = Joystick(JoystickWirings.default())
+joystick = Joystick(JoystickWirings.default(), on_clicked_button_function=on_click_joystick)
 scanner = Scanner(ScannerWirings.default(), card_detected_fn=on_card_detected)
 strip = LedStrip(LedStripWirings.default(), on_changed_fn=on_led_strip_changed)
 light = LightSensor(LightSensorWirings.default(), on_changed_fn=on_light_changed)

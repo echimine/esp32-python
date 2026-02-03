@@ -1,6 +1,7 @@
 from machine import Pin, SPI
 from mfrc522 import MFRC522
 from sensor import *
+import json
  
  
 class ScannerWirings:
@@ -29,6 +30,13 @@ class ScannerState(SensorState):
  
     def __str__(self):
         return "Detected: {}, UID: {}".format(self.detected, self.uid)
+    
+
+    def to_json(self):
+        return json.dumps({
+            "is_detected":self.detected,
+            "uid":self.uid
+        })
  
  
 class Scanner(Sensor):
@@ -53,24 +61,31 @@ class Scanner(Sensor):
         )
  
         self.last_uid = None  # anti double-scan
+        self.state = ScannerState()
  
     def read(self):
         stat, _ = self.reader.request(self.reader.REQIDL)
- 
+
+        # Pas de carte
         if stat != self.reader.OK:
             self.last_uid = None
-            return ScannerState(False)
- 
+            self.state = ScannerState(detected=False, uid=None)
+            return self.state
+
         stat, raw_uid = self.reader.anticoll()
         if stat != self.reader.OK:
-            return ScannerState(False)
- 
+            self.state = ScannerState(detected=False, uid=None)
+            return self.state
+
         uid = "-".join(map(str, raw_uid))
- 
-        # Anti spam : on déclenche une seule fois par carte
+
+        # Carte détectée
+        self.state = ScannerState(detected=True, uid=uid)
+
+        # Anti spam : callback seulement si nouvelle carte
         if uid != self.last_uid:
             self.last_uid = uid
             if self.card_detected_fn:
-                self.card_detected_fn(uid)
- 
-        return ScannerState(True, uid)
+                self.card_detected_fn(self)
+
+        return self.state
