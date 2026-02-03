@@ -1,5 +1,6 @@
 from machine import Pin, ADC
 from sensor import *
+import json
 
 class JoystickWirings:
 
@@ -22,6 +23,13 @@ class JoystickState(SensorState):
 
     def __str__(self):
         return "X: {}, Y: {}, Button: {}".format(self.x, self.y, self.button)
+    
+    def to_json(self):
+       return json.dumps({
+            "x":self.x,
+            "y": self.y,
+            "is_pressed":self.button
+        })
 
 class Joystick(Sensor):
 
@@ -40,13 +48,15 @@ class Joystick(Sensor):
         # Bouton
         self.btn = Pin(wiring.pinButton, Pin.IN, Pin.PULL_UP)
 
+        self.state = JoystickState()
+
     def read(self):
         x_val = self.x.read()
         y_val = self.y.read()
         pressed = not self.btn.value()
-        
+        self.state = JoystickState(x=x_val,y=y_val, button=pressed)
         if(pressed):
-            self.on_clicked_button_function()
+            self.on_clicked_button_function(self)
         # Invert because button is active low
         return JoystickState(x_val, y_val, pressed)    
     

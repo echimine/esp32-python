@@ -61,6 +61,18 @@ def on_button_clicked(btn):
     )
     ws.send(msg.to_json())
 
+def on_joystick_use(joystick:Joystick):
+    print(joystick.state.to_json())
+    print(joystick.state.x)
+    print("clické joystick")
+    msg = Message(
+        message_type=ENVOI_TYPE.TEXT,
+        emitter="eliott",
+        receiver="ALL",
+        value=joystick.state.to_json()
+    )
+    ws.send(msg.to_json())
+
 def on_card_detected(uid):
     print("Carte détectée :", uid)
     msg = Message(
