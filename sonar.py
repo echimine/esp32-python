@@ -1,65 +1,47 @@
-from machine import Pin
-import time
+from machine import Pin, ADC
 
 class SonarWirings:
-    
-    def __init__(self, pinTrig, pinEcho):
-        self.pinTrig = pinTrig
-        self.pinEcho = pinEcho
-    
+
+    def __init__(self, pinX, pinY, pinButton):
+        self.pinX = pinX
+        self.pinY = pinY
+        self.pinButton = pinButton
+
     @staticmethod
     def default():
-        return SonarWirings(pinTrig=5, pinEcho=18)
+        return JoystickWirings(pinX=34, pinY=35, pinButton=25)
 
 
 class SonarState:    
     
-    def __init__(self, distance=0):
-        self.distance = distance
-    
+    def __init__(self, x=0, y=0, button=False):
+        self.x = x
+        self.y = y
+        self.button = button
+
     def __str__(self):
-        return "Distance: {} cm".format(self.distance)
+        return "X: {}, Y: {}, Button: {}".format(self.x, self.y, self.button)
 
 class Sonar:
-    
-    def __init__(self, wiring:SonarWirings):
-        # Trigger pin (output)
-        self.trig = Pin(wiring.pinTrig, Pin.OUT)
-        
-        # Echo pin (input)
-        self.echo = Pin(wiring.pinEcho, Pin.IN)
-        
-        # Initialize trigger to low
-        self.trig.value(0)
-    
+
+    def __init__(self, wiring:JoystickWirings):
+        # Axes
+        self.x = ADC(Pin(wiring.pinX))
+        self.y = ADC(Pin(wiring.pinY))
+
+        # Config ADC
+        self.x.atten(ADC.ATTN_11DB)
+        self.y.atten(ADC.ATTN_11DB)
+        self.x.width(ADC.WIDTH_12BIT)
+        self.y.width(ADC.WIDTH_12BIT)
+
+        # Bouton
+        self.btn = Pin(wiring.pinButton, Pin.IN, Pin.PULL_UP)
+
     def read(self):
-        # Send a 10us pulse to trigger
-        self.trig.value(0)
-        time.sleep_us(2)
-        self.trig.value(1)
-        time.sleep_us(10)
-        self.trig.value(0)
-        
-        # Wait for echo to go high
-        timeout = 30000  # 30ms timeout
-        start = time.ticks_us()
-        while self.echo.value() == 0:
-            if time.ticks_diff(time.ticks_us(), start) > timeout:
-                return SonarState(distance=-1)  # Timeout error
-            pulse_start = time.ticks_us()
-        
-        # Wait for echo to go low
-        start = time.ticks_us()
-        while self.echo.value() == 1:
-            if time.ticks_diff(time.ticks_us(), start) > timeout:
-                return SonarState(distance=-1)  # Timeout error
-            pulse_end = time.ticks_us()
-        
-        # Calculate distance
-        pulse_duration = time.ticks_diff(pulse_end, pulse_start)
-        # Speed of sound is 343 m/s or 0.0343 cm/us
-        # Distance = (time * speed) / 2 (round trip)
-        distance = (pulse_duration * 0.0343) / 2
-        
-        return SonarState(distance=distance)
+        x_val = self.x.read()
+        y_val = self.y.read()
+        btn_val = not self.btn.value()  # Invert because button is active low
+        return JoystickState(x_val, y_val, btn_val)    
     
+

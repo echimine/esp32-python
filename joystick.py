@@ -25,10 +25,11 @@ class JoystickState(SensorState):
 
 class Joystick(Sensor):
 
-    def __init__(self, wiring:JoystickWirings):
+    def __init__(self, wiring:JoystickWirings, on_clicked_button_function = None):
         # Axes
         self.x = ADC(Pin(wiring.pinX))
         self.y = ADC(Pin(wiring.pinY))
+        self.on_clicked_button_function =on_clicked_button_function
 
         # Config ADC
         self.x.atten(ADC.ATTN_11DB)
@@ -42,7 +43,10 @@ class Joystick(Sensor):
     def read(self):
         x_val = self.x.read()
         y_val = self.y.read()
-        btn_val = not self.btn.value()  # Invert because button is active low
-        return JoystickState(x_val, y_val, btn_val)    
+        pressed = not self.btn.value()
+        
+        if(pressed):
+            self.on_clicked_button_function()
+        # Invert because button is active low
+        return JoystickState(x_val, y_val, pressed)    
     
-

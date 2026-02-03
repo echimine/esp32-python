@@ -21,6 +21,6 @@ class Orchestrator:
             else:
                 sensor.read()
                 
-    def update(self, sleepDuration = 0.2):
+    def update(self, sleepDuration = 0.001):
         self.read()
         time.sleep(sleepDuration)
