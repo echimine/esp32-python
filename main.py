@@ -83,9 +83,16 @@ def on_card_detected(scanner:Scanner):
     )
     ws.send(msg.to_json())
     
-def on_led_strip_changed(state):
-    pass
-    #print("LED strip updated:", state)
+def on_led_strip_changed(ledStrip:LedStrip):
+    print("ledStrip :", ledStrip.state)
+    msg = Message(
+        message_type=ENVOI_TYPE.TEXT,
+        emitter="eliott",
+        receiver="ALL",
+        value=ledStrip.state.to_json()
+    )
+    ws.send(msg.to_json())
+
     
 def on_light_changed(lightSensor:LightSensor):
     strip.bar(lightSensor.state.percent, color=(255, 0, 0))

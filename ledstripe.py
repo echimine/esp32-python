@@ -2,6 +2,7 @@ from machine import Pin
 import neopixel
 from sensor import *
 import time
+import json
 
 
 class LedStripWirings:
@@ -25,6 +26,13 @@ class LedStripState(SensorState):
         return "On: {}, Color: {}, Brightness: {}".format(
             self.is_on, self.color, self.brightness
         )
+    
+    def to_json(self):
+        return json.dumps({
+            "is_on": self.is_on,
+            "color": list(self.color), 
+            "brightness":self.brightness,
+        })
 
 
 class LedStrip(Sensor):
@@ -35,13 +43,38 @@ class LedStrip(Sensor):
         self.pin = Pin(wiring.data_pin, Pin.OUT)
         self.np = neopixel.NeoPixel(self.pin, wiring.led_count)
 
-        # State interne
-        self._is_on = False
-        self._color = (0, 0, 0)
-        self._brightness = 1.0
+        self.state = LedStripState(is_on=False, color=(0, 0, 0), brightness=1.0)
+
+        # optionnel: anti-spam state identique
+        self._last_emitted_key = None
+
+        self.clear(silent=True)  # éviter callback au boot si tu veux
 
         # Ensure off at start
         self.clear()
+
+    def _set_state(self, is_on=None, color=None, brightness=None):
+        """Met à jour self.state en gardant les valeurs si None."""
+        self.state = LedStripState(
+            is_on=self.state.is_on if is_on is None else is_on,
+            color=self.state.color if color is None else color,
+            brightness=self.state.brightness if brightness is None else brightness,
+        )
+
+    def _emit_changed(self):
+        if not self.on_changed_fn:
+            return
+
+        key = (self.state.is_on, self.state.color, round(self.state.brightness, 3))
+        if key == self._last_emitted_key:
+            return
+        self._last_emitted_key = key
+
+        # IMPORTANT: on passe SELF, comme Scanner
+        self.on_changed_fn(self)
+
+    def read(self):
+        return self.state
 
     def flash_led(self, index, color, duration_ms=120):
         """
@@ -81,17 +114,18 @@ class LedStrip(Sensor):
 
     # ---------- public api ----------
     def set_brightness(self, brightness: float):
-        self._brightness = brightness
-        # re-apply current color to the whole strip if currently on
-        if self._is_on:
-            self.fill(*self._color)
+        self._set_state(brightness=brightness)
+
+        if self.state.is_on:
+            # réapplique la couleur demandée
+            r, g, b = self.state.color
+            self.fill(r, g, b)  # fill va émettre le change
         else:
             self._emit_changed()
 
+
     def fill(self, r, g, b):
-        """Fill whole strip with a color (respects brightness)."""
-        self._is_on = True
-        self._color = (r, g, b)
+        self._set_state(is_on=True, color=(r, g, b))
 
         c = self._apply_brightness(r, g, b)
         for i in range(self.wiring.led_count):
@@ -100,16 +134,17 @@ class LedStrip(Sensor):
 
         self._emit_changed()
 
-    def clear(self):
-        """Turn off all leds."""
-        self._is_on = False
-        self._color = (0, 0, 0)
+
+    def clear(self, silent=False):
+        self._set_state(is_on=False, color=(0, 0, 0))
 
         for i in range(self.wiring.led_count):
             self.np[i] = (0, 0, 0)
         self.np.write()
 
-        self._emit_changed()
+        if not silent:
+            self._emit_changed()
+
 
     def set_pixel(self, index: int, r, g, b, auto_write=True):
         """Set one led (0..N-1)."""
@@ -125,22 +160,14 @@ class LedStrip(Sensor):
             self._emit_changed()
             
     def bar(self, percent, color=(255, 0, 0), bg=(0, 0, 0), auto_write=True):
-        # clamp 0..100
-        if percent < 0:
-            percent = 0
-        elif percent > 100:
-            percent = 100
-
+        percent = max(0, min(100, percent))
         n = self.wiring.led_count
         n_on = int((percent * n) / 100)
 
-        # applique brightness
+        self._set_state(is_on=(n_on > 0), color=color)
+
         c_on = self._apply_brightness(*color)
         c_off = self._apply_brightness(*bg)
-
-        # on considère "on" si au moins une LED est allumée
-        self._is_on = n_on > 0
-        self._color = color  # couleur "demandée" (non-brightness)
 
         for i in range(n):
             self.np[i] = c_on if i < n_on else c_off
@@ -148,6 +175,7 @@ class LedStrip(Sensor):
         if auto_write:
             self.np.write()
             self._emit_changed()
+
 
 
 
