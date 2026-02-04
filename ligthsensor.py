@@ -70,3 +70,4 @@ class LightSensor(Sensor):
                 self.on_changed_fn(self)
 
         return self.state
+

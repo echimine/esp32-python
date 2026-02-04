@@ -130,3 +130,4 @@ while True:
 
     # ou pendant 5 secondes
     #strip.rainbow(duration_ms=5000, brightness=0.2, speed=2.0, step=5)
+
