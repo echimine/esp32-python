@@ -10,6 +10,9 @@ import time
 ssid = 'Salle-de-creation'
 password = 'animation'
 
+#ssid = 'MAISON'
+#password = 'vivlemilan@73'
+
 def wifi_connect(ssid, password):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)

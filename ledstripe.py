@@ -50,8 +50,6 @@ class LedStrip(Sensor):
 
         self.clear(silent=True)  # éviter callback au boot si tu veux
 
-        # Ensure off at start
-        self.clear()
 
     def _set_state(self, is_on=None, color=None, brightness=None):
         """Met à jour self.state en gardant les valeurs si None."""
@@ -96,21 +94,27 @@ class LedStrip(Sensor):
 
     # ---------- helpers ----------
     def _apply_brightness(self, r, g, b):
-        # clamp brightness and rgb
-        br = self._brightness
-        if br < 0:
-            br = 0.0
-        elif br > 1:
-            br = 1.0
-
+        br = self.state.brightness
+        if br < 0: br = 0.0
+        if br > 1: br = 1.0
         r = int(max(0, min(255, r)) * br)
         g = int(max(0, min(255, g)) * br)
         b = int(max(0, min(255, b)) * br)
         return (r, g, b)
 
     def _emit_changed(self):
-        if self.on_changed_fn:
-            self.on_changed_fn(self.read())
+        if not self.on_changed_fn:
+            return
+        key = (self.state.is_on, self.state.color, round(self.state.brightness, 3))
+        if key == self._last_emitted_key:
+            return
+        self._last_emitted_key = key
+        # comme Scanner : on passe self
+        self.on_changed_fn(self)
+
+    def read(self):
+        return self.state
+
 
     # ---------- public api ----------
     def set_brightness(self, brightness: float):
@@ -147,17 +151,18 @@ class LedStrip(Sensor):
 
 
     def set_pixel(self, index: int, r, g, b, auto_write=True):
-        """Set one led (0..N-1)."""
         if index < 0 or index >= self.wiring.led_count:
-            return  # or raise ValueError
+            return
 
-        self._is_on = True  # if you set a pixel, strip is considered "on"
-        c = self._apply_brightness(r, g, b)
-        self.np[index] = c
+        # la strip est considérée "on" dès qu'on change un pixel
+        self._set_state(is_on=True, color=(r, g, b))
+
+        self.np[index] = self._apply_brightness(r, g, b)
 
         if auto_write:
             self.np.write()
             self._emit_changed()
+
             
     def bar(self, percent, color=(255, 0, 0), bg=(0, 0, 0), auto_write=True):
         percent = max(0, min(100, percent))
@@ -230,6 +235,78 @@ class LedStrip(Sensor):
             return (0, pos * 3, 255 - pos * 3)
         pos -= 170
         return (pos * 3, 255 - pos * 3, 0)
+    
+    def from_accelerometer(self, x, y, z, deadzone=0.15):
+        """
+        Pilote toute la strip à partir d’un accéléromètre.
+        - Axe dominant : X (jaune), Y (rouge), Z (bleu)
+        - +axe : barre proportionnelle
+        - -axe : extinction
+        """
+
+        # mémoire locale à la strip (anti-spam)
+        if not hasattr(self, "_accel_last_key"):
+            self._accel_last_key = None
+
+        # helper
+        def clamp(v, lo, hi):
+            return lo if v < lo else hi if v > hi else v
+
+        # --- axe dominant ---
+        ax, ay, az = abs(x), abs(y), abs(z)
+
+        if ax >= ay and ax >= az:
+            axis = "X"
+            value = x
+            color = (255, 255, 0)   # jaune
+        elif ay >= ax and ay >= az:
+            axis = "Y"
+            value = y
+            color = (255, 0, 0)     # rouge
+        else:
+            axis = "Z"
+            value = z
+            color = (0, 0, 255)     # bleu
+
+        # deadzone
+        if abs(value) < deadzone:
+            value = 0.0
+
+        # --- négatif : OFF ---
+        if value <= 0:
+            key = (axis, "NEG")
+            if key != self._accel_last_key:
+                self.clear()
+                self._accel_last_key = key
+            return
+
+        # --- positif : barre ---
+        value = clamp(value, 0.0, 1.0)
+        percent = int(value * 100)
+
+        key = (axis, "POS", percent)
+        if key != self._accel_last_key:
+            self.bar(percent, color=color, bg=(0, 0, 0), auto_write=True)
+            self._accel_last_key = key
+
+    def bar_from_axis(self, axis_value, color=(255, 255, 0), deadzone=0.10):
+        """
+        axis_value attendu dans [-1..+1] (normalisé)
+        - <=0 : OFF
+        - >0 : barre 0..100%
+        """
+        if abs(axis_value) < deadzone:
+            axis_value = 0.0
+
+        if axis_value <= 0:
+            self.clear()
+            return
+
+        if axis_value > 1:
+            axis_value = 1.0
+
+        self.bar(int(axis_value * 100), color=color, bg=(0, 0, 0), auto_write=True)
+
 
 
     def show(self):
@@ -238,9 +315,6 @@ class LedStrip(Sensor):
         self._emit_changed()
 
     def read(self):
-        """Return a state snapshot (like your Scanner)."""
-        return LedStripState(
-            is_on=self._is_on,
-            color=self._color,
-            brightness=self._brightness
-        )
+        return self.state
+
+

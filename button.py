@@ -22,7 +22,7 @@ class ButtonState(SensorState):
 
     def to_json(self):
         return json.dumps({
-            "btn_value": self.pressed
+            "isPressed": self.pressed
         })
 
 
