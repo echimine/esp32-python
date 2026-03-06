@@ -26,7 +26,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
-from Message import *
+from message import *
  
 from openai import OpenAI
  

@@ -7,11 +7,14 @@ print("in boot")
 import network
 import time
 
-ssid = 'Salle-de-creation'
-password = 'animation'
+#ssid = 'Salle-de-creation'
+#password = 'animation'
 
 #ssid = 'MAISON'
 #password = 'vivlemilan@73'
+
+ssid = 'Cudy-FA5C'
+password = '58448069'
 
 def wifi_connect(ssid, password):
     wlan = network.WLAN(network.STA_IF)

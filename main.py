@@ -10,6 +10,8 @@ from time import sleep
 from ledstripe import *
 from ligthsensor import *
 from accelerometre import *
+from sensortemperature import *
+from sonnar import *
 import json
 
 
@@ -171,7 +173,7 @@ def on_close(btn: Button):
 #ws://192.168.1.133:8765
 #"ws://192.168.4.230:9000"
 ws = WSClient(
-     "ws://192.168.4.230:9000",
+     "ws://192.168.10.127:9000",
      on_message=on_message,
      on_connect=on_connect,
      on_close=on_close
@@ -180,14 +182,16 @@ ws = WSClient(
 def on_button_clicked(btn):
     print(btn.state.to_json())
     print(btn.state.pressed)
-    print("clické")
-    msg = Message(
-        message_type=ENVOI_TYPE.TEXT,
-        emitter="ESP32_ELIOTT",
-        receiver="ALL",
-        value=btn.state.to_json()
-    )
-    #ws.send(msg.to_json())
+    print("coucou")
+    if btn.state.pressed:
+        msg = Message(
+            message_type=MessageType.ENVOI.SENSOR,
+            sensor_id=SensorId.BUTTON,
+            emitter="ESP32_ELIOTT",
+            receiver="MAC_ELIOTT_SACHA",
+            value=btn.state.to_json()
+        )
+        ws.send(msg.to_json())
 
 def on_click_joystick(joystick:Joystick):
     print(joystick.state.to_json())
@@ -201,15 +205,17 @@ def on_click_joystick(joystick:Joystick):
     )
     #ws.send(msg.to_json())
 
-def on_card_detected(scanner:Scanner):
-    print("Carte détectée :", scanner.state.uid)
+def on_card_detected(scanner: Scanner):
+    print("Carte détectée :" + scanner.state.to_json())
+
     msg = Message(
-        message_type=ENVOI_TYPE.TEXT,
+        message_type=ENVOI_TYPE.SENSOR,
         emitter="ESP32_ELIOTT",
-        receiver="ALL",
+        receiver="MAC_ELIOTT_SACHA",
+        sensor_id=SensorId.RFID,
         value=scanner.state.to_json()
     )
-    #ws.send(msg.to_json())
+    ws.send(msg.to_json())
     
 def on_led_strip_changed(ledStrip:LedStrip):
     #print("ledStrip :", ledStrip.state)
@@ -223,9 +229,10 @@ def on_led_strip_changed(ledStrip:LedStrip):
 
     
 def on_light_changed(lightSensor:LightSensor):
+    #print(lightSensor.state.percent)
     #strip.bar(lightSensor.state.percent, color=(255, 0, 0))
     msg = Message(
-        MessageType.ENVOI.SENSOR,emitter="ESP32_ELIOTT", receiver="ESP32_NATHAN", sensor_id=SensorId.LIGHT,value=lightSensor.state.to_json()
+        MessageType.ENVOI.SENSOR,emitter="ESP32_ELIOTT", receiver="MAC_ELIOTT_SACHA", sensor_id=SensorId.LIGHT,value=lightSensor.state.to_json()
     )
     #ws.send(msg.to_json())
     
@@ -247,11 +254,11 @@ def on_accelero_changed(accelerometre: Accelerometre):
     })
     
         
-    print(accelerometre.state)
+    #print(accelerometre.state)
     msg = Message(
         MessageType.ENVOI.SENSOR,emitter="ESP32_ELIOTT", receiver="ALL", sensor_id=SensorId.ACCELEROMETER,value=response
     )
-    ws.send(msg.to_json())
+    #ws.send(msg.to_json())
 
 def get_state_accepted_ranges(x, accepted_ranges):
     for k in accepted_ranges.keys():
@@ -261,19 +268,35 @@ def get_state_accepted_ranges(x, accepted_ranges):
 def get_items_by_value():
     pass
 
+def on_temp_changed(sensor):
+    # sensor est l’instance Temperature
+    print("temp changed:", sensor.state.to_json())
+    msg = Message(
+        MessageType.ENVOI.SENSOR,emitter="ESP32_ELIOTT", receiver="MAC_ELIOTT_SACHA", sensor_id=SensorId.TEMPERATURE,value=sensor.state.to_json()
+    )
+    ws.send(msg.to_json())
+
+def on_sonnar_changed(sonnar):
+    print("sonnar")
+    msg = Message(
+        MessageType.ENVOI.SENSOR,emitter="ESP32_ELIOTT", receiver="MAC_ELIOTT_SACHA", sensor_id=SensorId.TEMPERATURE,value=sensor.state.to_json()
+    )
+    #ws.send(msg.to_json())
+
 button = Button(ButtonWirings.default(), on_button_clicked)
-joystick = Joystick(JoystickWirings.default(), on_clicked_button_function=on_click_joystick)
+#joystick = Joystick(JoystickWirings.default(), on_clicked_button_function=on_click_joystick)
 scanner = Scanner(ScannerWirings.default(), card_detected_fn=on_card_detected)
 strip = LedStrip(LedStripWirings.default(), on_changed_fn=on_led_strip_changed)
 light = LightSensor(LightSensorWirings.default(), on_changed_fn=on_light_changed)
-accel = Accelerometre(AccelerometreWirings.default(), on_changed_fn=on_accelero_changed)
+temperature = Temperature(TemperatureWirings.default(), on_update_fn=on_temp_changed)
+sonnar = Sonar(SonarWirings.default(),on_read_fn=on_sonnar_changed)
+#accel = Accelerometre(AccelerometreWirings.default(), on_changed_fn=on_accelero_changed)
 
 o = Orchestrator(verbose=False) \
     .add_sensor(button) \
-    .add_sensor(joystick) \
     .add_sensor(scanner) \
-    .add_sensor(light) \
-    .add_sensor(accel) 
+    .add_sensor(temperature) \
+    .add_sensor(light) 
 
 while True:
     for _ in range(10):  # évite boucle infinie

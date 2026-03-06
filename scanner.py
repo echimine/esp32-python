@@ -34,8 +34,7 @@ class ScannerState(SensorState):
 
     def to_json(self):
         return json.dumps({
-            "is_detected":self.detected,
-            "uid":self.uid
+            "isdetected":self.detected,
         })
  
  
@@ -56,8 +55,8 @@ class Scanner(Sensor):
  
         self.reader = MFRC522(
             spi=self.spi,
-            cs=Pin(wiring.cs),
-            rst=Pin(wiring.rst)
+            cs=Pin(wiring.cs, Pin.OUT),
+            rst=Pin(wiring.rst, Pin.OUT)
         )
  
         self.last_uid = None  # anti double-scan
@@ -66,26 +65,13 @@ class Scanner(Sensor):
     def read(self):
         stat, _ = self.reader.request(self.reader.REQIDL)
 
-        # Pas de carte
-        if stat != self.reader.OK:
-            self.last_uid = None
-            self.state = ScannerState(detected=False, uid=None)
-            return self.state
+        detected = stat == self.reader.OK
 
-        stat, raw_uid = self.reader.anticoll()
-        if stat != self.reader.OK:
-            self.state = ScannerState(detected=False, uid=None)
-            return self.state
+        # changement d'état seulement
+        if detected != self.state.detected:
+            self.state = ScannerState(detected=detected, uid=None)
 
-        uid = "-".join(map(str, raw_uid))
-
-        # Carte détectée
-        self.state = ScannerState(detected=True, uid=uid)
-
-        # Anti spam : callback seulement si nouvelle carte
-        if uid != self.last_uid:
-            self.last_uid = uid
-            if self.card_detected_fn:
+            if detected and self.card_detected_fn:
                 self.card_detected_fn(self)
 
         return self.state
